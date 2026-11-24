@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Meloncino · Turni e stipendio</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="payroll.js"></script>
+  <script defer src="calendar.js"></script>
+  <script defer src="calibration.js"></script>
+  <script defer src="seed.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#panoramica"><span class="brand-mark" aria-hidden="true">m.</span> meloncino</a>
+    <p class="sidebar-label">CALCOLO AL MELONE</p>
+    <nav aria-label="Navigazione principale">
+      <a href="#panoramica">Panoramica <span>01</span></a>
+      <a href="#turni">Calendario turni <span>02</span></a>
+      <a href="#dettaglio">Dettaglio stipendio <span>03</span></a>
+      <a href="#annuale">Il tuo anno <span>04</span></a>
+      <a href="#impostazioni">Regole e parametri del calcolo <span>05</span></a>
+    </nav>
+    <div class="contract-card"><span class="tiny">PROFILO CONTRATTUALE</span><strong>Metalmeccanico<br>Industria · D2</strong><p>Operaio somministrato<br>Randstad / Alfa Laval</p><span class="badge">Dati sul tuo dispositivo</span></div>
+    <p class="sidebar-bottom">Un calendario. Tutte le voci.<br>Nessun dato inviato online.</p>
+  </aside>
+  <main id="panoramica">
+    <header class="page-header"><div><p class="eyebrow">IL TUO OSSERVATORIO PERSONALE</p></div><div class="header-actions"><span id="save-status" role="status">Caricamento…</span><button id="backup" class="button light">Esporta backup</button><label class="button light file-label">Importa backup<input id="import" type="file" accept=".json,application/json"></label></div></header>
+    <noscript>Per usare Meloncino abilita JavaScript nel browser.</noscript>
+    <div id="fatal" role="alert" hidden></div>
+    <section class="month-toolbar" aria-label="Selezione periodo"><div id="period-picker" class="period-picker"><button id="previous" class="icon-button" aria-label="Mese precedente">←</button><label class="sr-only" for="month">Mese</label><select id="month"></select><label class="sr-only" for="year">Anno</label><select id="year"></select><button id="next" class="icon-button" aria-label="Mese successivo">→</button></div><div class="year-actions"><button id="delete-year" class="button light danger">Elimina anno</button><button id="new-year" class="button primary">Crea nuovo anno</button></div></section>
+    <dialog id="year-management" class="year-dialog" aria-labelledby="year-dialog-title" aria-describedby="schedule-source">
+      <div class="section-heading"><h2 id="year-dialog-title">Crea nuovo anno</h2><button id="close-year" type="button" class="icon-button" aria-label="Chiudi creazione anno">×</button></div>
+      <p id="schedule-source" class="small muted"></p><p id="year-error" class="notice" role="alert" hidden></p><form id="year-form" class="field-grid">
+      <label>Anno da creare<input id="new-year-number" type="number" min="2026" max="2100" required autofocus></label>
+      <label>Turnazione<select id="schedule-mode"><option value="previous">Continua dall’anno precedente</option><option value="custom">Imposta un nuovo ciclo</option></select></label>
+      <label>Ciclo lavoro + riposo<select id="schedule-cycle"><option value="6,2">6 + 2</option><option value="4,2">4 + 2</option><option value="5,2">5 + 2</option><option value="3,1">3 + 1</option></select></label>
+      <label>Ordine dei turni<select id="schedule-order"><option value="1,2,3">Mattina → Pomeriggio → Notte</option><option value="2,3,1">Pomeriggio → Notte → Mattina</option><option value="3,2,1">Notte → Pomeriggio → Mattina</option><option value="0">Giornata ordinaria</option></select></label>
+      <label>Primo giorno del ciclo<input id="schedule-anchor" type="date" required><span class="field-hint">Primo giorno lavorativo del primo turno scelto. Può precedere l’anno.</span></label>
+      <div class="form-action"><button class="button primary">Crea e compila l’anno</button></div>
+    </form><p class="small muted">8 ore per giornata lavorativa, zero nei riposi. Nessun giorno di ferie o compensativo presunto. Le aliquote restano quelle del modello 2026, da verificare per gli anni successivi.</p></dialog>
+    <section id="empty-archive" class="panel" hidden><h2>Nessun anno nell’archivio</h2><p class="muted">Usa «Crea nuovo anno» per iniziare oppure importa un backup. Gli anni eliminati non vengono ricreati automaticamente.</p></section>
+    <div id="year-content">
+    <details class="warnings-details"><summary>Avvertenze e limiti della stima</summary><div id="warnings" class="notice" role="status"></div></details>
+    <section class="metrics" aria-label="Riepilogo mensile">
+      <article class="metric net"><div class="metric-label">NETTO CALIBRATO <span>PREVISIONE</span></div><strong id="calibrated-net">—</strong><p id="calibrated-net-caption">Previsione dai pagamenti precedenti</p></article>
+      <article class="metric"><div class="metric-label">LORDO CALIBRATO</div><strong id="calibrated-gross">—</strong><p id="calibrated-gross-caption">Proiezione statistica, non imponibile verificato</p></article>
+      <article class="metric"><div class="metric-label">ORE RETRIBUITE</div><strong id="hours">—</strong><p id="hours-caption">—</p></article>
+    </section>
+    <details class="calibration-panel">
+      <summary id="calibration-title">Calibrazione intelligente</summary>
+      <div class="section-heading"><p class="eyebrow">PREVISIONE DAI PAGAMENTI PRECEDENTI · SEMPRE ATTIVA</p></div>
+      <div class="calibration-correction"><span>Correzione applicata</span><strong id="calibration-percent">—</strong></div>
+      <p id="calibration-status" class="small muted" role="status"></p>
+      <details><summary>Metodo e limiti della calibrazione</summary><p class="small muted">Usa almeno due pagamenti precedenti inclusi con netto positivo e ore pagate comparabili: fra metà e doppio delle ore del mese da prevedere. Include l’anno precedente, se presente, e si aggiorna con i nuovi pagamenti. Esclude i campioni con tredicesima o premio di produzione e gli scarti anomali. Non usa il pagamento del mese da prevedere né mesi futuri. Il fattore percentuale è applicato a lordo e netto come previsione statistica: non ricostruisce l’imponibile e non modifica ore, tariffe, imposte o cedolini.</p></details>
+    </details>
+    <section id="turni" class="panel">
+      <div class="section-heading"><div><p class="eyebrow">02 / IL MESE, GIORNO PER GIORNO</p><h2>Il tuo calendario</h2></div><button id="csv-days" class="button light">Esporta turni CSV</button></div>
+      <div class="shift-legend" aria-labelledby="shift-legend-title"><h3 id="shift-legend-title">Sigle e colori dei turni</h3><div class="legend" aria-label="Colori dei turni"><span class="tag shift-">— Da compilare</span><span class="tag shift-0">0 Ordinaria</span><span class="tag shift-1">1 Mattina</span><span class="tag shift-2">2 Pomeriggio</span><span class="tag shift-3">3 Notte</span><span class="tag shift-R">R Riposo</span><span class="tag shift-F">F Ferie</span><span class="tag shift-M">M Malattia</span><span class="tag shift-H">H Festività non goduta</span><span class="tag shift-C">C Riposo turno retribuito</span><span class="tag shift-P">P Festività goduta</span><span class="tag shift-L">L ROL</span></div></div>
+      <details class="batch"><summary>Compilazione rapida di un intervallo</summary><form id="batch-form" class="inline-form"><label>Dal giorno<input id="batch-from" type="number" min="1" max="31" value="1" required></label><label>Al giorno<input id="batch-to" type="number" min="1" max="31" value="7" required></label><label>Turno<select id="batch-shift"></select></label><label>Ore al giorno<input id="batch-hours" type="text" inputmode="decimal" pattern="([0-7]([.,][0-9]{1,2})?|8([.,]0{1,2})?)" value="8" required></label><button class="button primary">Applica all’intervallo</button><p class="muted small">Sostituisce i turni nell’intervallo selezionato.</p></form></details>
+      <div class="calendar-reference"><span id="baseline-status" class="small muted"></span><div><button id="lock-calendar" class="button light">Blocca turnazione di riferimento</button><button id="reset-calendar" class="button light" disabled>Ripristina turnazione</button></div></div>
+      <div class="calendar-weekdays" aria-hidden="true"><span>LUN</span><span>MAR</span><span>MER</span><span>GIO</span><span>VEN</span><span>SAB</span><span>DOM</span></div><div id="calendar" class="calendar" aria-label="Giorni del mese"></div>
+      <details class="calendar-help"><summary>Ore, malattia e festività: come sono stimate</summary><p class="small muted">0 = giornata ordinaria; C = riposo turno retribuito alla paga base, in voce separata, senza maggiorazioni o gettoni. R = riposo non retribuito; F = ferie; M = malattia, stimata alla paga base; H = festività non goduta (6,67 h predefinite); P = festività goduta; L = ROL. “Festivo” cambia le maggiorazioni, non aggiunge automaticamente ore H. Ore ordinarie fino a 8 al giorno; straordinario separato. Il riferimento bloccato non impedisce modifiche: permette di ripristinare l’intero calendario, comprese ore e straordinari salvati.</p></details>
+    </section>
+    <section id="dettaglio" class="panel">
+      <div class="section-heading"><div><p class="eyebrow">03 / DAL LORDO AL NETTO</p></div><button id="print" class="button light">Stampa / PDF</button></div>
+      <figure id="monthly-chart" class="pie-chart"><figcaption>Dal lordo al netto <span class="small muted">La composizione del mese</span></figcaption><div class="donut-wrap"><div id="monthly-pie" class="pie-disc" role="img" aria-label="Ripartizione mensile del lordo" aria-describedby="monthly-legend monthly-chart-note"></div><div class="donut-center"><span>COMPETENZE LORDE</span><strong id="chart-gross">—</strong></div></div><ul id="monthly-legend" class="pie-legend" aria-label="Importi e percentuali mensili"></ul><p id="monthly-chart-note" class="small muted"></p></figure>
+      <div class="payroll-layout"><div class="table-wrap"><table><caption>Competenze mensili per voce di cedolino</caption><thead><tr><th>Voce</th><th>Quantità</th><th>Tariffa €</th><th>Importo €</th></tr></thead><tbody id="pay-lines"></tbody><tfoot><tr><th colspan="3">Totale lordo</th><td id="table-gross"></td></tr></tfoot></table></div><div class="deductions"><h3>Contributi e IRPEF</h3><dl id="tax-lines"></dl><p class="small muted">INPS + FSBS: stima sul lordo. IRPEF lorda cumulativa: prima delle detrazioni. Il netto include le detrazioni e tutte le eventuali rettifiche salvate.</p></div></div>
+    </section>
+    <section id="annuale" class="panel">
+      <div class="section-heading"><div><p class="eyebrow">04 / UNA VISIONE PIÙ AMPIA</p><h2 id="annual-title">Il tuo anno</h2></div><button id="csv-year" class="button light">Esporta anno CSV</button></div>
+      <div class="annual-top"><div class="annual-net-summary"><span class="tiny">NETTO ANNUALE CALIBRATO · MESI INCLUSI</span><strong id="annual-net">—</strong><p id="annual-calibrated-summary" class="small muted"></p><div class="actual-summary"><span>Netto effettivo inserito</span><strong id="annual-actual">—</strong><p id="annual-comparison" class="small muted"></p></div><p id="annual-extra-summary" class="small muted"></p></div><div class="threshold"><div class="section-heading"><span>Imponibile ordinario progressivo</span><strong id="progress-label">—</strong></div><meter id="progress" min="0" max="28000" value="0" aria-label="Avanzamento nello scaglione IRPEF">Soglia 28.000 €</meter><p id="threshold-text" class="small muted"></p></div></div>
+      <figure id="annual-chart" class="annual-chart"><figcaption>Il ritmo del tuo anno <span class="small muted">Previsioni calibrate e pagamenti reali, mese per mese</span></figcaption>
+        <div class="comparison"><article class="metric actual-net">
+          <div class="section-heading"><h3>Pagamento reale</h3><label>Mese del pagamento<select id="actual-month"></select></label></div>
+          <strong id="actual">—</strong>
+          <form id="actual-net-form"><label id="actual-net-label" for="month-actualNet">Netto effettivamente ricevuto €</label><input id="month-actualNet" type="number" min="0" max="1000000" step="0.01" placeholder="Inserisci o lascia vuoto" data-scope="month" data-key="actualNet" data-nullable="true"><span class="field-hint">Confronto del mese e campione per previsioni successive. Vuoto = non disponibile.</span></form>
+          <p id="actual-caption">Confronto con la simulazione mensile</p>
+        </article></div>
+        <div class="chart-key"><span><i class="calibrated-key"></i>Netto calibrato</span><span><i class="actual-key"></i>Netto reale</span></div><div id="annual-bars"></div><p id="annual-chart-note" class="small muted"></p>
+      </figure>
+      <div class="table-wrap annual-table" tabindex="0" role="region" aria-label="Riepilogo mensile, scorri per vedere tutte le colonne"><table><caption>Spunta i mesi da includere nel totale annuale. Errore = (calibrato − reale) / reale × 100; delta = calibrato − reale. Progressivo = somma dei lordi calibrati inclusi, non imponibile fiscale; * indica mesi inclusi senza stima. “—”: dato mancante; “n.d.”: reale zero.</caption><thead><tr><th>Mese · Includi nel totale annuale</th><th>Ore lavorate</th><th>Ore pagate</th><th>Lordo €</th><th>Contributi €</th><th>IRPEF €</th><th>Netto reale €</th><th>Netto calibrato €</th><th>Errore calibrato %</th><th>Delta calibrato − reale €</th><th>Progressivo lordo calibrato €</th></tr></thead><tbody id="year-lines"></tbody></table></div>
+      <p class="small muted">Le righe escluse dal totale annuale mantengono la propria simulazione mensile e il pagamento reale; non contribuiscono a totali e progressivi annuali.</p>
+      <p id="annual-balance" class="notice"></p>
+      <details><summary>Cedolini di riferimento</summary><div class="table-wrap"><table><caption>Riferimenti PDF originali, senza arrotondamenti nel lordo. La simulazione include le ore C retribuite separatamente: il lordo può differire dai PDF anche con le altre quantità riconciliate. Le ore pagate comprendono C ed eventuali festività aggiuntive e possono differire dalla testata PDF.</caption><thead><tr><th>Mese</th><th>Ore pagate attuali</th><th>Ore testata PDF</th><th>Lordo automatico €</th><th>Lordo attuale €</th><th>Competenze PDF €</th><th>Scarto lordo €</th><th>Totale originale PDF €</th><th>Arrotondamento PDF €</th><th>Netto PDF €</th><th>Imponibile ordinario PDF €</th><th>Progressivo PDF €</th></tr></thead><tbody id="references"></tbody></table></div></details>
+    </section>
+    <section id="impostazioni" class="panel">
+      <details class="settings-details"><summary>Regole e parametri del calcolo</summary>
+      <div class="section-heading"><div><p class="eyebrow">05 / LE REGOLE DEL CALCOLO</p><h2>Parametri, non scatole nere.</h2></div><span class="badge">Modifiche salvate automaticamente</span></div>
+      <p class="notice">Modello fiscale 2026: aliquote 23% / 33% / 43%, anche nelle simulazioni degli anni successivi. Le maggiorazioni sono calcolate automaticamente dalla paga base × la percentuale corrispondente. Cambiare la base aggiorna tutti i mesi dell’anno selezionato, anche quelli storici.</p>
+      <form id="settings-form"></form>
+      <h3 id="month-settings-title">Parametri del mese selezionato</h3><p class="small muted">Le modifiche qui valgono solo per il mese selezionato. Il premio vuoto usa il valore predefinito; il 10% vuoto segue le mattine feriali. Le quantità da cedolino, se presenti, prevalgono sugli automatismi.</p><form id="month-settings" class="field-grid"></form>
+      <h3>Tredicesima e premio di produzione</h3><p class="small muted">Tredicesima stimata dalla base mensile × ratei / 12, pagata a dicembre. Base e ratei sono modificabili: non si presume l’esatta maturazione contrattuale. Il premio di produzione è tassato ordinariamente; eventuali regimi agevolati richiedono una verifica distinta.</p><form id="annual-settings" class="field-grid"></form>
+      <details id="quantity-reconciliation"><summary>Riconciliazione: quantità da cedolino</summary><p class="small muted">Le quantità sostituiscono gli automatismi della singola voce senza riscrivere i giorni. Svuota per tornare al calendario.</p><p id="quantity-status" class="notice"></p><button id="source-quantities" class="button light" type="button" hidden>Usa quantità del cedolino</button><p id="quantity-empty" class="small muted">Nessuna quantità da cedolino disponibile per questo mese.</p><form id="quantity-settings" class="field-grid"></form></details>
+      <h3>Progressivi esterni iniziali</h3><p class="small muted">Solo imponibili dell’anno non già rappresentati nei mesi inclusi: evitare il doppio conteggio. Non inserire qui il progressivo di ottobre se includi già maggio–ottobre.</p><form id="opening-form" class="field-grid"></form>
+      <div class="method"><h3>Assunzioni da conoscere</h3><ul><li>Maggiorazioni diurne: festivo/domenica, sabato, feriale; niente cumulo fra queste fasce. Il 25% mensile è indipendente e opzionale.</li><li>Notte: ora iniziale configurabile, predefinita 22:00. Il 60% si applica solo alle ore effettive della domenica, il resto al 35%. Sabato 22–domenica 06: 2 h al 35% e 6 h al 60%; domenica 22–lunedì 06: 2 h al 60% e 6 h al 35%. Il gettone dipende solo dal giorno d’inizio. Ore e importi rimangono nel mese d’inizio.</li><li>Riposo turno C: paga base in voce separata, senza gettoni o maggiorazioni.</li><li>Tredicesima e premio di produzione concorrono a contributi e imponibile ordinario nel mese di pagamento. Nessuna imposta sostitutiva del 15%.</li><li>La calibrazione è una proiezione statistica distinta: non altera il lordo contrattuale né il progressivo fiscale. Il lordo reale non è ricavabile dal solo netto.</li><li>Esclusi TFR, welfare, buoni pasto, cuneo fiscale, trattamento integrativo e rinnovi al 5%. Nessun reddito di altri datori presunto. Il modello non sostituisce il conguaglio fiscale personale.</li></ul><p class="small">Fonte fiscale: <a href="https://www.lavoro.gov.it/notizie/pagine/legge-di-bilancio-2026-le-principali-misure-lavoratori-imprese-e-famiglie" target="_blank" rel="noopener noreferrer">Ministero del Lavoro · Legge di bilancio 2026</a>.</p></div>
+      </details>
+    </section>
+    </div>
+    <footer>Nessun melone è stato sprecato in questo progetto. <span>Uno strumento di previsione personale. Non sostituisce il cedolino o una consulenza fiscale.</span><a href="README.md">Guida e formule</a></footer>
+  </main>
+</body>
+</html>
